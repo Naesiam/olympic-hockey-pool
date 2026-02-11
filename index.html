@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Olympic Hockey Pool Dashboard</title>
+
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    background: #000000;
+    color: #e6e6e6;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.column {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.left {
+    border-right: 1px solid #333;
+}
+
+.section-header {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.section-header img {
+    height: 32px;
+}
+
+/* Loading Bar */
+.loading-bar {
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #00eaff, #ff00c8);
+    background-size: 200% 100%;
+    animation: loading 1.5s linear infinite;
+    margin-bottom: 15px;
+    border-radius: 2px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+@keyframes loading {
+    0% { background-position: 0% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Game Rows */
+.game-row {
+    display: flex;
+    align-items: center;
+    justify-content:center;
+    background: #1a1a1a;
+    padding: 6px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+}
+
+.team {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: inherit;
+}
+
+.team.left { justify-content: flex-end; }
+.team.right { justify-content: flex-start; }
+
+.team img {
+    width: 32px;
+    height: 20px;
+    object-fit: cover;
+}
+
+.score {
+    font-size: 18px;
+    font-weight: bold;
+    width: 32px;
+    text-align: center;
+}
+
+.team.winner { color: #4da3ff !important; }
+.team.loser { color: #ffffff !important; }
+
+/* Standings Table */
+table {
+    width: auto;
+    border-collapse: collapse;
+    margin-top: 4px;
+}
+
+th, td {
+    padding: 2px 4px;
+    line-height: 1.2;
+    border-bottom: 1px solid #333;
+    text-align: center;
+}
+
+th {
+    background: #111;
+}
+
+.hover-target {
+    cursor: pointer;
+}
+
+/* Tie-Breaker */
+.tiebreaker-section {
+    margin-top: 30px;
+}
+
+.tiebreaker-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #ccc;
+}
+
+.tiebreaker-table th,
+.tiebreaker-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #333;
+}
+
+/* Hover Popup */
+.popup {
+    position: absolute;
+    background: #111;
+    border: 1px solid #333;
+    padding: 10px;
+    border-radius: 6px;
+    display: none;
+    z-index: 999;
+    width: 180px;
+    pointer-events: none;
+}
+
+.popup-title {
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+.popup-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+}
+
+/* Logo */
+.logo {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 90px;
+    opacity: 0.95;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LEFT COLUMN -->
+<div class="column left">
+    <div class="section-header">
+        <img src="artwork/olympic-rings.png" alt="Olympic Rings">
+        Schedule
+    </div>
+
+    <!-- Last Updated Timestamp -->
+     <div id="last-updated" style="color:#888; font-size:13px; margin:4px 0 10px;"></div>
+
+    <div id="schedule-loading" class="loading-bar"></div>
+    <div id="schedule-container"></div>
+</div>
+
+<!-- RIGHT COLUMN -->
+<div class="column right">
+    <div class="section-header">Standings</div>
+
+    <div id="standings-loading" class="loading-bar"></div>
+    <div id="standings-container"></div>
+
+    <!-- Tie-Breaker -->
+    <div class="tiebreaker-section">
+        <div class="tiebreaker-title">Tie-Breaker Rules</div>
+
+        <table class="tiebreaker-table">
+            <tr>
+                <th>Player</th>
+                <th>Gold</th>
+                <th>Silver</th>
+                <th>Bronze</th>
+                <th>Goals</th>
+            </tr>
+
+            <tr><td>Roland</td><td>CAN</td><td>USA</td><td>SWE</td><td>6</td></tr>
+            <tr><td>John</td><td>CAN</td><td>SUI</td><td>USA</td><td>7</td></tr>
+            <tr><td>Sean</td><td>USA</td><td>CAN</td><td>CZE</td><td>1</td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- Logo -->
+<img src="artwork/naesiam.png" class="logo" alt="Naesiam Logo">
+
+<!-- Hover Popup -->
+<div id="hover-popup" class="popup"></div>
+
+<!-- External JS Modules -->
+<script src="scripts/schedule-api.js"></script>
+<script src="scripts/updateScores.js"></script>
+<script src="js/standings.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
