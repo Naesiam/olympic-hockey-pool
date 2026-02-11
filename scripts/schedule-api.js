@@ -1,8 +1,8 @@
 // ------------------------------------------------------------
 //  CONFIG
 // ------------------------------------------------------------
-const API_URL =
-  "https://www.hockey-live.sk/api/games/OG/2026?key=8da799b0ddab8888f1e556f0e63415ce";
+const API_URL = "https://yellow-grass-54c8.srhansen428.workers.dev";
+
 
 // Flag assets
 const flagMap = {
@@ -411,5 +411,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
   scheduleNextRefresh();
 });
+
 
 
