@@ -409,19 +409,24 @@ function showTeamGoalPopup(teamCode, anchorRect) {
   let html = "";
 
   games.forEach((g) => {
-    const isHome = g.team1 === teamCode;
-    const homeCode = g.team1;
-    const awayCode = g.team2;
+    const homeCode = g.team1; // API: home
+    const awayCode = g.team2; // API: away
+
+    // Match schedule orientation: AWAY (team2) on the left, HOME (team1) on the right
+    const leftCode = awayCode;
+    const rightCode = homeCode;
+    const leftScore = g.score2;
+    const rightScore = g.score1;
 
     html += `
       <div class="game-row">
-        <img src="${flagMap[homeCode] || ""}" class="flag" alt="${homeCode}">
-        <span class="team-name">${homeCode}</span>
-        <span class="score-text">${g.score1}</span>
+        <img src="${flagMap[leftCode] || ""}" class="flag" alt="${leftCode}">
+        <span class="team-name">${leftCode}</span>
+        <span class="score-text">${leftScore}</span>
         <span class="score-text">-</span>
-        <span class="score-text">${g.score2}</span>
-        <span class="team-name">${awayCode}</span>
-        <img src="${flagMap[awayCode] || ""}" class="flag" alt="${awayCode}">
+        <span class="score-text">${rightScore}</span>
+        <span class="team-name">${rightCode}</span>
+        <img src="${flagMap[rightCode] || ""}" class="flag" alt="${rightCode}">
       </div>
     `;
   });
@@ -435,6 +440,7 @@ function showTeamGoalPopup(teamCode, anchorRect) {
   popup.style.left = `${left}px`;
   popup.style.display = "block";
 }
+
 
 function hideTeamGoalPopup() {
   const popup = document.getElementById("teamGoalPopup");
