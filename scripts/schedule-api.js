@@ -73,7 +73,15 @@ function mapApiGameToInternal(g) {
   const score2 =
     g.score?.goals2 !== undefined ? Number(g.score.goals2) : null;
 
-  const status = g.score?.status || "scheduled";
+  const rawStatus = (g.status || g.score?.status || "scheduled").toLowerCase();
+
+  let status = "scheduled";
+  if (rawStatus.includes("final")) {
+  status = "finished";
+  } else if (rawStatus.includes("live") || rawStatus.includes("progress")) {
+  status = "inprogress";
+  }
+
 
   // Convert CET → Local Time (EST)
   let dateLabel = "TBD";
@@ -411,6 +419,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
   scheduleNextRefresh();
 });
+
 
 
 
