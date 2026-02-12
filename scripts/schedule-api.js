@@ -68,10 +68,16 @@ function mapApiGameToInternal(g) {
   const team1 = g.team1short || "TBD";
   const team2 = g.team2short || "TBD";
 
-  const score1 =
-    g.score?.goals1 !== undefined ? Number(g.score.goals1) : null;
-  const score2 =
-    g.score?.goals2 !== undefined ? Number(g.score.goals2) : null;
+const score1 =
+  g.goals1 !== undefined ? Number(g.goals1) :
+  g.score?.goals1 !== undefined ? Number(g.score.goals1) :
+  null;
+
+const score2 =
+  g.goals2 !== undefined ? Number(g.goals2) :
+  g.score?.goals2 !== undefined ? Number(g.score.goals2) :
+  null;
+
 
   const rawStatus = (g.status || g.score?.status || "scheduled").toLowerCase();
 
@@ -419,6 +425,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
   scheduleNextRefresh();
 });
+
 
 
 
