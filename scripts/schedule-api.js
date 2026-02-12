@@ -547,4 +547,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
   scheduleNextRefresh();
 });
-
