@@ -3,7 +3,6 @@
 // ------------------------------------------------------------
 const API_URL = "https://yellow-grass-54c8.srhansen428.workers.dev";
 
-
 // Flag assets
 const flagMap = {
   CAN: "artwork/can.png",
@@ -27,9 +26,22 @@ const teamsByPlayer = {
   Roland: ["USA", "FIN", "GER", "ITA"]
 };
 
+// Fantasy team names (for mini-tables)
+const fantasyNames = {
+  Sean: "Nut Grabber",
+  John: "Where’s My Mouse!!!",
+  Roland: "Innocent Bystandard"
+};
+
+// Player initials for schedule rows
+const playerInitials = {
+  Sean: "S",
+  John: "J",
+  Roland: "R"
+};
+
 // Internal schedule array
 let schedule = [];
-
 
 // ------------------------------------------------------------
 //  UTILITIES
@@ -60,7 +72,6 @@ function updateLastUpdatedTimestamp() {
   }
 }
 
-
 // ------------------------------------------------------------
 //  MAP API GAME → INTERNAL FORMAT
 // ------------------------------------------------------------
@@ -68,26 +79,24 @@ function mapApiGameToInternal(g) {
   const team1 = g.team1short || "TBD";
   const team2 = g.team2short || "TBD";
 
-const score1 =
-  g.goals1 !== undefined ? Number(g.goals1) :
-  g.score?.goals1 !== undefined ? Number(g.score.goals1) :
-  null;
+  const score1 =
+    g.goals1 !== undefined ? Number(g.goals1) :
+    g.score?.goals1 !== undefined ? Number(g.score.goals1) :
+    null;
 
-const score2 =
-  g.goals2 !== undefined ? Number(g.goals2) :
-  g.score?.goals2 !== undefined ? Number(g.score.goals2) :
-  null;
-
+  const score2 =
+    g.goals2 !== undefined ? Number(g.goals2) :
+    g.score?.goals2 !== undefined ? Number(g.score.goals2) :
+    null;
 
   const rawStatus = (g.status || g.score?.status || "scheduled").toLowerCase();
 
   let status = "scheduled";
   if (rawStatus.includes("final")) {
-  status = "finished";
+    status = "finished";
   } else if (rawStatus.includes("live") || rawStatus.includes("progress")) {
-  status = "inprogress";
+    status = "inprogress";
   }
-
 
   // Convert CET → Local Time (EST)
   let dateLabel = "TBD";
@@ -120,9 +129,24 @@ const score2 =
   };
 }
 
+// ------------------------------------------------------------
+//  OWNER / INITIAL HELPERS
+// ------------------------------------------------------------
+function ownerOf(teamCode) {
+  for (const [player, teams] of Object.entries(teamsByPlayer)) {
+    if (teams.includes(teamCode)) return player;
+  }
+  return null;
+}
+
+function getPlayerInitialForTeam(teamCode) {
+  const owner = ownerOf(teamCode);
+  if (!owner) return "";
+  return playerInitials[owner] || "";
+}
 
 // ------------------------------------------------------------
-//  RENDER SCHEDULE
+//  RENDER SCHEDULE (with initials)
 // ------------------------------------------------------------
 function renderSchedule() {
   const container = document.getElementById("schedule-container");
@@ -159,8 +183,19 @@ function renderSchedule() {
       game.score2 != null &&
       game.score2 > game.score1;
 
+    const leftInitial = getPlayerInitialForTeam(game.team1);
+    const rightInitial = getPlayerInitialForTeam(game.team2);
+
     const teamLeft = document.createElement("div");
     teamLeft.className = "team left " + (winner1 ? "winner" : "loser");
+
+    if (leftInitial) {
+      const initSpan = document.createElement("span");
+      initSpan.textContent = leftInitial + " ·";
+      initSpan.style.fontSize = "12px";
+      initSpan.style.color = "#aaa";
+      teamLeft.appendChild(initSpan);
+    }
 
     const img1 = document.createElement("img");
     img1.src = flagMap[game.team1] || "";
@@ -189,6 +224,14 @@ function renderSchedule() {
     teamRight.appendChild(img2);
     teamRight.appendChild(document.createTextNode(game.team2));
 
+    if (rightInitial) {
+      const initSpanR = document.createElement("span");
+      initSpanR.textContent = "· " + rightInitial;
+      initSpanR.style.fontSize = "12px";
+      initSpanR.style.color = "#aaa";
+      teamRight.appendChild(initSpanR);
+    }
+
     // ⭐ Correct orientation: TEAM2 – TIME – TEAM1
     row.appendChild(teamRight);
     row.appendChild(score2);
@@ -209,7 +252,6 @@ function renderSchedule() {
   });
 }
 
-
 // ------------------------------------------------------------
 //  STANDINGS (GOALS ONLY)
 // ------------------------------------------------------------
@@ -219,13 +261,6 @@ function computeStandings() {
     John: { name: "John", goals: 0 },
     Roland: { name: "Roland", goals: 0 }
   };
-
-  function ownerOf(teamCode) {
-    for (const [player, teams] of Object.entries(teamsByPlayer)) {
-      if (teams.includes(teamCode)) return player;
-    }
-    return null;
-  }
 
   schedule.forEach((g) => {
     if (g.status !== "finished") return;
@@ -240,9 +275,28 @@ function computeStandings() {
   return Object.values(standingsMap).sort((a, b) => b.goals - a.goals);
 }
 
+// ------------------------------------------------------------
+//  TEAM GOAL MAP (for fantasy tables & popups)
+// ------------------------------------------------------------
+function computeTeamGoals() {
+  const teamGoals = {};
+
+  schedule.forEach((g) => {
+    if (g.status !== "finished") return;
+
+    if (g.team1 && g.score1 != null) {
+      teamGoals[g.team1] = (teamGoals[g.team1] || 0) + g.score1;
+    }
+    if (g.team2 && g.score2 != null) {
+      teamGoals[g.team2] = (teamGoals[g.team2] || 0) + g.score2;
+    }
+  });
+
+  return teamGoals;
+}
 
 // ------------------------------------------------------------
-//  RENDER STANDINGS
+//  RENDER STANDINGS (main table)
 // ------------------------------------------------------------
 function renderStandings() {
   const container = document.getElementById("standings-container");
@@ -262,7 +316,7 @@ function renderStandings() {
     html += `
       <tr>
         <td>${row.name}</td>
-        <td class="hover-target" data-player="${row.name}">${row.goals}</td>
+        <td>${row.goals}</td>
       </tr>
     `;
   });
@@ -270,72 +324,142 @@ function renderStandings() {
   html += `</table>`;
   container.innerHTML = html;
 
-  attachHoverPopup();
+  // After main standings, render fantasy tables
+  renderFantasyTeamTables();
 }
 
-
 // ------------------------------------------------------------
-//  HOVER POPUP
+//  RENDER FANTASY TEAM TABLES (Standings Step 1)
 // ------------------------------------------------------------
-function attachHoverPopup() {
-  const popup = document.getElementById("hover-popup");
-  const targets = document.querySelectorAll(".hover-target");
-  if (!popup || !targets.length) return;
+function renderFantasyTeamTables() {
+  const container = document.getElementById("teamTablesContainer");
+  if (!container) return;
 
-  const computeGoalsForTeam = (team) => {
-    return schedule.reduce((sum, g) => {
-      if (g.status !== "finished") return sum;
-      if (g.team1 === team && g.score1 != null) return sum + g.score1;
-      if (g.team2 === team && g.score2 != null) return sum + g.score2;
-      return sum;
-    }, 0);
-  };
+  const teamGoals = computeTeamGoals();
 
-  const showPopup = (target) => {
-    const player = target.dataset.player;
-    const teams = teamsByPlayer[player] || [];
-    const rect = target.getBoundingClientRect();
+  container.innerHTML = "";
 
-    popup.style.left = rect.left + "px";
-    popup.style.top = rect.bottom + 5 + "px";
+  Object.entries(teamsByPlayer).forEach(([player, teams]) => {
+    const fantasyName = fantasyNames[player] || player;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "fantasy-table";
+
+    let html = `
+      <div class="fantasy-table-title">${fantasyName}</div>
+      <table>
+        <tr>
+          <th>Team</th>
+          <th>Goals</th>
+        </tr>
+    `;
 
     let total = 0;
-    let content = `<div class="popup-title">${player}</div>`;
 
-    teams.forEach((team) => {
-      const goals = computeGoalsForTeam(team);
+    teams.forEach((teamCode) => {
+      const goals = teamGoals[teamCode] || 0;
       total += goals;
-      content += `
-        <div class="popup-row">
-          <span>${team}</span>
-          <span>${goals}</span>
-        </div>
+
+      html += `
+        <tr>
+          <td>${teamCode}</td>
+          <td class="team-goals-cell" data-team="${teamCode}">${goals}</td>
+        </tr>
       `;
     });
 
-    content += `
-      <div style="border-top:1px solid #333; margin-top:6px; padding-top:6px;" class="popup-row">
-        <strong>Total</strong>
-        <strong>${total}</strong>
-      </div>
+    html += `
+        <tr>
+          <th>Total</th>
+          <th>${total}</th>
+        </tr>
+      </table>
     `;
 
-    popup.innerHTML = content;
-    popup.style.display = "block";
-  };
-
-  const hidePopup = () => {
-    popup.style.display = "none";
-  };
-
-  targets.forEach((target) => {
-    target.addEventListener("mouseenter", () => showPopup(target));
-    target.addEventListener("mouseleave", hidePopup);
+    wrapper.innerHTML = html;
+    container.appendChild(wrapper);
   });
 
-  document.addEventListener("scroll", hidePopup, true);
+  attachTeamGoalHover();
 }
 
+// ------------------------------------------------------------
+//  TEAM GOAL POPUP (Standings Step 2)
+// ------------------------------------------------------------
+function getGamesForTeam(teamCode) {
+  return schedule.filter((g) => {
+    if (g.status !== "finished") return false;
+    const scoredAsHome = g.team1 === teamCode && g.score1 != null && g.score1 > 0;
+    const scoredAsAway = g.team2 === teamCode && g.score2 != null && g.score2 > 0;
+    return scoredAsHome || scoredAsAway;
+  });
+}
+
+function showTeamGoalPopup(teamCode, anchorRect) {
+  const popup = document.getElementById("teamGoalPopup");
+  if (!popup) return;
+
+  const games = getGamesForTeam(teamCode);
+
+  if (!games.length) {
+    popup.style.display = "none";
+    return;
+  }
+
+  let html = "";
+
+  games.forEach((g) => {
+    const isHome = g.team1 === teamCode;
+    const homeCode = g.team1;
+    const awayCode = g.team2;
+
+    html += `
+      <div class="game-row">
+        <img src="${flagMap[homeCode] || ""}" class="flag" alt="${homeCode}">
+        <span class="team-name">${homeCode}</span>
+        <span class="score-text">${g.score1}</span>
+        <span class="score-text">-</span>
+        <span class="score-text">${g.score2}</span>
+        <span class="team-name">${awayCode}</span>
+        <img src="${flagMap[awayCode] || ""}" class="flag" alt="${awayCode}">
+      </div>
+    `;
+  });
+
+  popup.innerHTML = html;
+
+  const top = window.scrollY + anchorRect.bottom + 6;
+  const left = window.scrollX + anchorRect.left;
+
+  popup.style.top = `${top}px`;
+  popup.style.left = `${left}px`;
+  popup.style.display = "block";
+}
+
+function hideTeamGoalPopup() {
+  const popup = document.getElementById("teamGoalPopup");
+  if (!popup) return;
+  popup.style.display = "none";
+}
+
+function attachTeamGoalHover() {
+  const cells = document.querySelectorAll(".team-goals-cell");
+  if (!cells.length) return;
+
+  cells.forEach((cell) => {
+    cell.addEventListener("mouseenter", () => {
+      const teamCode = cell.getAttribute("data-team");
+      const rect = cell.getBoundingClientRect();
+      showTeamGoalPopup(teamCode, rect);
+    });
+
+    cell.addEventListener("mouseleave", () => {
+      hideTeamGoalPopup();
+    });
+  });
+
+  document.addEventListener("scroll", hideTeamGoalPopup, true);
+}
 
 // ------------------------------------------------------------
 //  FETCH + BOOTSTRAP
@@ -357,7 +481,6 @@ async function loadScheduleFromApi() {
 
     // ⭐ Update timestamp ONLY when API call finishes
     updateLastUpdatedTimestamp();
-
   } catch (err) {
     console.error("Error loading schedule:", err);
   } finally {
@@ -365,7 +488,6 @@ async function loadScheduleFromApi() {
     hideLoading("standings-loading");
   }
 }
-
 
 // ------------------------------------------------------------
 //  SMART AUTO REFRESH (unchanged)
@@ -425,8 +547,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
   scheduleNextRefresh();
 });
-
-
-
-
-
