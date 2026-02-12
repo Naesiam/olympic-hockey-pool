@@ -29,8 +29,8 @@ const teamsByPlayer = {
 // Fantasy team names (for mini-tables)
 const fantasyNames = {
   Sean: "Nut Grabber",
-  John: "Where’s My Mouse!!!",
-  Roland: "Innocent Bystandard"
+  John: "Innocent Bystandard",
+  Roland: "Where’s My Mouse!!!"
 };
 
 // Player initials for schedule rows
@@ -547,3 +547,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
   scheduleNextRefresh();
 });
+
