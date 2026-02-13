@@ -3,44 +3,27 @@
 // ------------------------------------------------------------
 const API_URL = "https://yellow-grass-54c8.srhansen428.workers.dev";
 
-// Flag assets
 const flagMap = {
-  CAN: "artwork/can.png",
-  FIN: "artwork/fin.png",
-  USA: "artwork/usa.png",
-  GER: "artwork/ger.png",
-  SWE: "artwork/swe.png",
-  SUI: "artwork/sui.png",
-  CZE: "artwork/cze.png",
-  SVK: "artwork/svk.png",
-  LAT: "artwork/lat.png",
-  DEN: "artwork/den.png",
-  ITA: "artwork/ita.png",
-  FRA: "artwork/fra.png"
+  CAN: "artwork/can.png", FIN: "artwork/fin.png", USA: "artwork/usa.png",
+  GER: "artwork/ger.png", SWE: "artwork/swe.png", SUI: "artwork/sui.png",
+  CZE: "artwork/cze.png", SVK: "artwork/svk.png", LAT: "artwork/lat.png",
+  DEN: "artwork/den.png", ITA: "artwork/ita.png", FRA: "artwork/fra.png"
 };
 
-// Drafted teams
 const teamsByPlayer = {
   Sean: ["SWE", "CZE", "LAT", "DEN"],
   John: ["CAN", "SUI", "SVK", "FRA"],
   Roland: ["USA", "FIN", "GER", "ITA"]
 };
 
-// Fantasy team names (for mini-tables)
 const fantasyNames = {
   Sean: "Nut Grabber",
   John: "Innocent Bystandard",
   Roland: "Where’s My Mouse!!!"
 };
 
-// Player initials for schedule rows
-const playerInitials = {
-  Sean: "S",
-  John: "J",
-  Roland: "R"
-};
+const playerInitials = { Sean: "S", John: "J", Roland: "R" };
 
-// Internal schedule array
 let schedule = [];
 
 // ------------------------------------------------------------
@@ -57,19 +40,30 @@ function hideLoading(id) {
 }
 
 // ------------------------------------------------------------
-//  LAST UPDATED TIMESTAMP
+//  LAST UPDATED (DISPLAY ONLY)
 // ------------------------------------------------------------
 function updateLastUpdatedTimestamp() {
-  const now = new Date();
-  const formatted = now.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-
   const el = document.getElementById("last-updated");
-  if (el) {
-    el.textContent = `Last updated: ${formatted}`;
+  if (!el) return;
+
+  const stored = localStorage.getItem("lastUpdated");
+  el.textContent = stored
+    ? `Last updated: ${stored}`
+    : `Last updated: pending`;
+}
+
+// ------------------------------------------------------------
+//  SCORE CHANGE DETECTOR
+// ------------------------------------------------------------
+function detectScoreChange(oldData, newData) {
+  if (!oldData) return true;
+
+  for (let i = 0; i < newData.length; i++) {
+    const a = oldData[i], b = newData[i];
+    if (!a || !b) continue;
+    if (a.score1 !== b.score1 || a.score2 !== b.score2) return true;
   }
+  return false;
 }
 
 // ------------------------------------------------------------
@@ -80,73 +74,44 @@ function mapApiGameToInternal(g) {
   const team2 = g.team2short || "TBD";
 
   const score1 =
-    g.goals1 !== undefined ? Number(g.goals1) :
-    g.score?.goals1 !== undefined ? Number(g.score.goals1) :
-    null;
+    g.goals1 != null ? Number(g.goals1) :
+    g.score?.goals1 != null ? Number(g.score.goals1) : null;
 
   const score2 =
-    g.goals2 !== undefined ? Number(g.goals2) :
-    g.score?.goals2 !== undefined ? Number(g.score.goals2) :
-    null;
+    g.goals2 != null ? Number(g.goals2) :
+    g.score?.goals2 != null ? Number(g.score.goals2) : null;
 
   const rawStatus = (g.status || g.score?.status || "scheduled").toLowerCase();
+  const status = rawStatus.includes("final") ? "finished" : "scheduled";
 
-  let status = "scheduled";
-  if (rawStatus.includes("final")) {
-    status = "finished";
-  } else if (rawStatus.includes("live") || rawStatus.includes("progress")) {
-    status = "inprogress";
-  }
-
-  // Convert CET → Local Time (EST)
-  let dateLabel = "TBD";
-  let timeLabel = "";
-
+  let dateLabel = "TBD", timeLabel = "";
   if (g.date) {
-    const cetString = g.date.replace(" ", "T") + "+01:00";
-    const d = new Date(cetString);
-
-    if (!isNaN(d.getTime())) {
-      const monthShort = d.toLocaleString("en-US", { month: "short" });
-      dateLabel = `${monthShort} ${d.getDate()}`;
-
-      timeLabel = d.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit"
-      });
+    const d = new Date(g.date.replace(" ", "T") + "+01:00");
+    if (!isNaN(d)) {
+      dateLabel = `${d.toLocaleString("en-US", { month: "short" })} ${d.getDate()}`;
+      timeLabel = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     }
   }
 
-  return {
-    date: dateLabel,
-    time: timeLabel,
-    team1,
-    team2,
-    score1,
-    score2,
-    status,
-    rawDate: g.date
-  };
+  return { date: dateLabel, time: timeLabel, team1, team2, score1, score2, status, rawDate: g.date };
 }
 
 // ------------------------------------------------------------
-//  OWNER / INITIAL HELPERS
+//  OWNER HELPERS
 // ------------------------------------------------------------
 function ownerOf(teamCode) {
-  for (const [player, teams] of Object.entries(teamsByPlayer)) {
+  for (const [player, teams] of Object.entries(teamsByPlayer))
     if (teams.includes(teamCode)) return player;
-  }
   return null;
 }
 
 function getPlayerInitialForTeam(teamCode) {
   const owner = ownerOf(teamCode);
-  if (!owner) return "";
-  return playerInitials[owner] || "";
+  return owner ? playerInitials[owner] : "";
 }
 
 // ------------------------------------------------------------
-//  RENDER SCHEDULE (with initials)
+//  RENDER SCHEDULE
 // ------------------------------------------------------------
 function renderSchedule() {
   const container = document.getElementById("schedule-container");
@@ -155,108 +120,84 @@ function renderSchedule() {
   container.innerHTML = "";
   let currentDate = "";
 
-  schedule.forEach((game) => {
-    if (game.date !== currentDate) {
-      currentDate = game.date;
-
-      const dateDiv = document.createElement("div");
-      dateDiv.style.margin = "20px 0 10px";
-      dateDiv.style.fontSize = "20px";
-      dateDiv.style.fontWeight = "bold";
-      dateDiv.style.color = "#ccc";
-      dateDiv.textContent = currentDate;
-      container.appendChild(dateDiv);
+  schedule.forEach((g) => {
+    if (g.date !== currentDate) {
+      currentDate = g.date;
+      const d = document.createElement("div");
+      d.style.margin = "20px 0 10px";
+      d.style.fontSize = "20px";
+      d.style.fontWeight = "bold";
+      d.style.color = "#ccc";
+      d.textContent = currentDate;
+      container.appendChild(d);
     }
 
     const row = document.createElement("div");
     row.className = "game-row";
 
-    const winner1 =
-      game.status === "finished" &&
-      game.score1 != null &&
-      game.score2 != null &&
-      game.score1 > game.score2;
+    const winner1 = g.status === "finished" && g.score1 > g.score2;
+    const winner2 = g.status === "finished" && g.score2 > g.score1;
 
-    const winner2 =
-      game.status === "finished" &&
-      game.score1 != null &&
-      game.score2 != null &&
-      game.score2 > game.score1;
-
-    const leftInitial = getPlayerInitialForTeam(game.team1);
-    const rightInitial = getPlayerInitialForTeam(game.team2);
+    const leftInit = getPlayerInitialForTeam(g.team1);
+    const rightInit = getPlayerInitialForTeam(g.team2);
 
     const teamLeft = document.createElement("div");
     teamLeft.className = "team left " + (winner1 ? "winner" : "loser");
-
-    if (leftInitial) {
-      const initSpan = document.createElement("span");
-      initSpan.textContent = leftInitial + " ·";
-      initSpan.style.fontSize = "12px";
-      initSpan.style.color = "#aaa";
-      teamLeft.appendChild(initSpan);
+    if (leftInit) {
+      const s = document.createElement("span");
+      s.textContent = leftInit + " ·";
+      s.style.fontSize = "12px";
+      s.style.color = "#aaa";
+      teamLeft.appendChild(s);
     }
-
     const img1 = document.createElement("img");
-    img1.src = flagMap[game.team1] || "";
-    img1.alt = game.team1;
+    img1.src = flagMap[g.team1] || "";
+    img1.alt = g.team1;
     teamLeft.appendChild(img1);
-    teamLeft.appendChild(document.createTextNode(game.team1));
+    teamLeft.appendChild(document.createTextNode(g.team1));
 
     const score1 = document.createElement("div");
     score1.className = "score";
-    score1.textContent = game.status !== "finished" ? "-" : game.score1;
+    score1.textContent = g.status !== "finished" ? "-" : g.score1;
 
     const timeDiv = document.createElement("div");
     timeDiv.className = "game-time";
-    timeDiv.textContent = game.time;
+    timeDiv.textContent = g.time;
 
     const score2 = document.createElement("div");
     score2.className = "score";
-    score2.textContent = game.status !== "finished" ? "-" : game.score2;
+    score2.textContent = g.status !== "finished" ? "-" : g.score2;
 
     const teamRight = document.createElement("div");
     teamRight.className = "team right " + (winner2 ? "winner" : "loser");
-
     const img2 = document.createElement("img");
-    img2.src = flagMap[game.team2] || "";
-    img2.alt = game.team2;
+    img2.src = flagMap[g.team2] || "";
+    img2.alt = g.team2;
     teamRight.appendChild(img2);
-    teamRight.appendChild(document.createTextNode(game.team2));
-
-    if (rightInitial) {
-      const initSpanR = document.createElement("span");
-      initSpanR.textContent = "· " + rightInitial;
-      initSpanR.style.fontSize = "12px";
-      initSpanR.style.color = "#aaa";
-      teamRight.appendChild(initSpanR);
+    teamRight.appendChild(document.createTextNode(g.team2));
+    if (rightInit) {
+      const s = document.createElement("span");
+      s.textContent = "· " + rightInit;
+      s.style.fontSize = "12px";
+      s.style.color = "#aaa";
+      teamRight.appendChild(s);
     }
 
-    // ⭐ Correct orientation: TEAM2 – TIME – TEAM1
     row.appendChild(teamRight);
     row.appendChild(score2);
     row.appendChild(timeDiv);
     row.appendChild(score1);
     row.appendChild(teamLeft);
 
-    if (game.status === "inprogress" || game.status === "live") {
-      const liveTag = document.createElement("div");
-      liveTag.textContent = "IN PROGRESS";
-      liveTag.style.color = "#ffcc00";
-      liveTag.style.fontSize = "12px";
-      liveTag.style.marginLeft = "10px";
-      row.appendChild(liveTag);
-    }
-
     container.appendChild(row);
   });
 }
 
 // ------------------------------------------------------------
-//  STANDINGS (GOALS ONLY)
+//  STANDINGS
 // ------------------------------------------------------------
 function computeStandings() {
-  const standingsMap = {
+  const map = {
     Sean: { name: "Sean", goals: 0 },
     John: { name: "John", goals: 0 },
     Roland: { name: "Roland", goals: 0 }
@@ -264,118 +205,72 @@ function computeStandings() {
 
   schedule.forEach((g) => {
     if (g.status !== "finished") return;
-
-    const t1Owner = ownerOf(g.team1);
-    const t2Owner = ownerOf(g.team2);
-
-    if (t1Owner && g.score1 != null) standingsMap[t1Owner].goals += g.score1;
-    if (t2Owner && g.score2 != null) standingsMap[t2Owner].goals += g.score2;
+    const o1 = ownerOf(g.team1), o2 = ownerOf(g.team2);
+    if (o1 && g.score1 != null) map[o1].goals += g.score1;
+    if (o2 && g.score2 != null) map[o2].goals += g.score2;
   });
 
-  return Object.values(standingsMap).sort((a, b) => b.goals - a.goals);
+  return Object.values(map).sort((a, b) => b.goals - a.goals);
 }
 
-// ------------------------------------------------------------
-//  TEAM GOAL MAP (for fantasy tables & popups)
-// ------------------------------------------------------------
 function computeTeamGoals() {
-  const teamGoals = {};
-
+  const map = {};
   schedule.forEach((g) => {
     if (g.status !== "finished") return;
-
-    if (g.team1 && g.score1 != null) {
-      teamGoals[g.team1] = (teamGoals[g.team1] || 0) + g.score1;
-    }
-    if (g.team2 && g.score2 != null) {
-      teamGoals[g.team2] = (teamGoals[g.team2] || 0) + g.score2;
-    }
+    if (g.team1 && g.score1 != null) map[g.team1] = (map[g.team1] || 0) + g.score1;
+    if (g.team2 && g.score2 != null) map[g.team2] = (map[g.team2] || 0) + g.score2;
   });
-
-  return teamGoals;
+  return map;
 }
 
 // ------------------------------------------------------------
-//  RENDER STANDINGS (main table)
+//  RENDER STANDINGS + FANTASY TABLES
 // ------------------------------------------------------------
 function renderStandings() {
   const container = document.getElementById("standings-container");
   if (!container) return;
 
   const standings = computeStandings();
-
   let html = `
     <table>
-      <tr>
-        <th>Player</th>
-        <th>Goals</th>
-      </tr>
+      <tr><th>Player</th><th>Goals</th></tr>
   `;
 
-  standings.forEach((row) => {
-    html += `
-      <tr>
-        <td>${row.name}</td>
-        <td>${row.goals}</td>
-      </tr>
-    `;
+  standings.forEach((r) => {
+    html += `<tr><td>${r.name}</td><td>${r.goals}</td></tr>`;
   });
 
   html += `</table>`;
   container.innerHTML = html;
 
-  // After main standings, render fantasy tables
   renderFantasyTeamTables();
 }
 
-// ------------------------------------------------------------
-//  RENDER FANTASY TEAM TABLES (Standings Step 1)
-// ------------------------------------------------------------
 function renderFantasyTeamTables() {
   const container = document.getElementById("teamTablesContainer");
   if (!container) return;
 
   const teamGoals = computeTeamGoals();
-
   container.innerHTML = "";
 
   Object.entries(teamsByPlayer).forEach(([player, teams]) => {
-    const fantasyName = fantasyNames[player] || player;
-
     const wrapper = document.createElement("div");
     wrapper.className = "fantasy-table";
 
     let html = `
-      <div class="fantasy-table-title">${fantasyName}</div>
+      <div class="fantasy-table-title">${fantasyNames[player]}</div>
       <table>
-        <tr>
-          <th>Team</th>
-          <th>Goals</th>
-        </tr>
+        <tr><th>Team</th><th>Goals</th></tr>
     `;
 
     let total = 0;
-
-    teams.forEach((teamCode) => {
-      const goals = teamGoals[teamCode] || 0;
-      total += goals;
-
-      html += `
-        <tr>
-          <td>${teamCode}</td>
-          <td class="team-goals-cell" data-team="${teamCode}">${goals}</td>
-        </tr>
-      `;
+    teams.forEach((t) => {
+      const g = teamGoals[t] || 0;
+      total += g;
+      html += `<tr><td>${t}</td><td class="team-goals-cell" data-team="${t}">${g}</td></tr>`;
     });
 
-    html += `
-        <tr>
-          <th>Total</th>
-          <th>${total}</th>
-        </tr>
-      </table>
-    `;
-
+    html += `<tr><th>Total</th><th>${total}</th></tr></table>`;
     wrapper.innerHTML = html;
     container.appendChild(wrapper);
   });
@@ -384,86 +279,54 @@ function renderFantasyTeamTables() {
 }
 
 // ------------------------------------------------------------
-//  TEAM GOAL POPUP (Standings Step 2)
+//  TEAM GOAL POPUP
 // ------------------------------------------------------------
 function getGamesForTeam(teamCode) {
   return schedule.filter((g) => {
     if (g.status !== "finished") return false;
-    const scoredAsHome = g.team1 === teamCode && g.score1 != null && g.score1 > 0;
-    const scoredAsAway = g.team2 === teamCode && g.score2 != null && g.score2 > 0;
-    return scoredAsHome || scoredAsAway;
+    return (g.team1 === teamCode && g.score1 > 0) ||
+           (g.team2 === teamCode && g.score2 > 0);
   });
 }
 
-function showTeamGoalPopup(teamCode, anchorRect) {
+function showTeamGoalPopup(teamCode, rect) {
   const popup = document.getElementById("teamGoalPopup");
   if (!popup) return;
 
   const games = getGamesForTeam(teamCode);
-
-  if (!games.length) {
-    popup.style.display = "none";
-    return;
-  }
+  if (!games.length) return popup.style.display = "none";
 
   let html = "";
-
   games.forEach((g) => {
-    const homeCode = g.team1; // API: home
-    const awayCode = g.team2; // API: away
-
-    // Match schedule orientation: AWAY (team2) on the left, HOME (team1) on the right
-    const leftCode = awayCode;
-    const rightCode = homeCode;
-    const leftScore = g.score2;
-    const rightScore = g.score1;
-
+    const left = g.team2, right = g.team1;
     html += `
       <div class="game-row">
-        <img src="${flagMap[leftCode] || ""}" class="flag" alt="${leftCode}">
-        <span class="team-name">${leftCode}</span>
-        <span class="score-text">${leftScore}</span>
-        <span class="score-text">-</span>
-        <span class="score-text">${rightScore}</span>
-        <span class="team-name">${rightCode}</span>
-        <img src="${flagMap[rightCode] || ""}" class="flag" alt="${rightCode}">
+        <img src="${flagMap[left]}" class="flag"><span class="team-name">${left}</span>
+        <span class="score-text">${g.score2}</span><span class="score-text">-</span>
+        <span class="score-text">${g.score1}</span><span class="team-name">${right}</span>
+        <img src="${flagMap[right]}" class="flag">
       </div>
     `;
   });
 
   popup.innerHTML = html;
-
-  const top = window.scrollY + anchorRect.bottom + 6;
-  const left = window.scrollX + anchorRect.left;
-
-  popup.style.top = `${top}px`;
-  popup.style.left = `${left}px`;
+  popup.style.top = `${window.scrollY + rect.bottom + 6}px`;
+  popup.style.left = `${window.scrollX + rect.left}px`;
   popup.style.display = "block";
 }
 
-
 function hideTeamGoalPopup() {
   const popup = document.getElementById("teamGoalPopup");
-  if (!popup) return;
-  popup.style.display = "none";
+  if (popup) popup.style.display = "none";
 }
 
 function attachTeamGoalHover() {
-  const cells = document.querySelectorAll(".team-goals-cell");
-  if (!cells.length) return;
-
-  cells.forEach((cell) => {
+  document.querySelectorAll(".team-goals-cell").forEach((cell) => {
     cell.addEventListener("mouseenter", () => {
-      const teamCode = cell.getAttribute("data-team");
-      const rect = cell.getBoundingClientRect();
-      showTeamGoalPopup(teamCode, rect);
+      showTeamGoalPopup(cell.dataset.team, cell.getBoundingClientRect());
     });
-
-    cell.addEventListener("mouseleave", () => {
-      hideTeamGoalPopup();
-    });
+    cell.addEventListener("mouseleave", hideTeamGoalPopup);
   });
-
   document.addEventListener("scroll", hideTeamGoalPopup, true);
 }
 
@@ -477,16 +340,32 @@ async function loadScheduleFromApi() {
 
     const res = await fetch(API_URL);
     const data = await res.json();
-
     const games = Array.isArray(data) ? data : (data.games || data);
 
     schedule = games.map(mapApiGameToInternal);
 
+    const oldData = JSON.parse(localStorage.getItem("lastScores") || "null");
+    const scoreChanged = detectScoreChange(oldData, schedule);
+
+    if (scoreChanged) {
+      const now = new Date();
+      localStorage.setItem(
+        "lastUpdated",
+        now.toLocaleString("en-US", {
+          timeZone: "America/New_York",
+          dateStyle: "medium",
+          timeStyle: "short"
+        })
+      );
+    }
+
+    localStorage.setItem("lastScores", JSON.stringify(schedule));
+
     renderSchedule();
     renderStandings();
 
-    // ⭐ Update timestamp ONLY when API call finishes
-    updateLastUpdatedTimestamp();
+    if (scoreChanged) updateLastUpdatedTimestamp();
+
   } catch (err) {
     console.error("Error loading schedule:", err);
   } finally {
@@ -496,60 +375,41 @@ async function loadScheduleFromApi() {
 }
 
 // ------------------------------------------------------------
-//  SMART AUTO REFRESH (unchanged)
+//  SMART AUTO REFRESH
 // ------------------------------------------------------------
 let refreshTimer = null;
 
 function gamesRemainingToday() {
   const today = new Date().toLocaleDateString("en-CA");
-
   return schedule.some((g) => {
     if (!g.rawDate) return false;
-
-    const gameDate = g.rawDate.split(" ")[0];
-    const isToday = (gameDate === today);
-
-    if (!isToday) return false;
-
-    return g.status !== "finished";
+    const isToday = g.rawDate.split(" ")[0] === today;
+    return isToday && g.status !== "finished";
   });
 }
 
 function getRefreshInterval() {
-  const now = new Date();
-  const hour = now.getHours();
-
+  const hour = new Date().getHours();
   const isGameWindow =
     (hour >= 5 && hour <= 8) ||
     (hour >= 9 && hour <= 12) ||
     (hour >= 13 && hour <= 16);
 
-  return isGameWindow
-    ? 10 * 60 * 1000
-    : 2 * 60 * 60 * 1000;
+  return isGameWindow ? 10 * 60 * 1000 : 2 * 60 * 60 * 1000;
 }
 
 function scheduleNextRefresh() {
   if (refreshTimer) clearTimeout(refreshTimer);
-
-  if (!gamesRemainingToday()) {
-    console.log("All games finished for today — auto-refresh paused.");
-    return;
-  }
-
-  const interval = getRefreshInterval();
+  if (!gamesRemainingToday()) return;
 
   refreshTimer = setTimeout(async () => {
     await loadScheduleFromApi();
-
-    // ⭐ Timestamp updates here too, but ONLY after API call
-    updateLastUpdatedTimestamp();
-
     scheduleNextRefresh();
-  }, interval);
+  }, getRefreshInterval());
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   await loadScheduleFromApi();
+  updateLastUpdatedTimestamp(); // initial pending
   scheduleNextRefresh();
 });
