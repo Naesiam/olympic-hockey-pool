@@ -284,8 +284,8 @@ function renderFantasyTeamTables() {
 function getGamesForTeam(teamCode) {
   return schedule.filter((g) => {
     if (g.status !== "finished") return false;
-    return (g.team1 === teamCode && g.score1 > null) ||
-           (g.team2 === teamCode && g.score2 > null);
+    return (g.team1 === teamCode && g.score1 != null) ||
+           (g.team2 === teamCode && g.score2 != null);
   });
 }
 
@@ -413,4 +413,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateLastUpdatedTimestamp(); // initial pending
   scheduleNextRefresh();
 });
+
 
